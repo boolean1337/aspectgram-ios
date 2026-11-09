@@ -615,6 +615,9 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
                 }
             }
             #endif
+            // Aspectgram: сигнал iCloud-адресов больше не передаётся в fetchBackupIps
+            // (backup-IP отключены), но сам контекст CloudData выше всё ещё создаётся.
+            _ = wrappedAdditionalSource
             
             if !supplementary {
                 // Aspectgram: официальные backup-IP Telegram отключены —
