@@ -70,6 +70,29 @@ jobs:
           echo "BUILD_NUMBER=$(echo $BUILD_NUMBER)" >> $GITHUB_ENV
           echo "APP_VERSION=$(echo $APP_VERSION)" >> $GITHUB_ENV
 
+          # Fake provisioning profiles carry a CMS signature that breaks as soon as
+          # their ExpirationDate is patched, and BuildConfiguration.py verifies it.
+          # Extract the payload, bump the date, and re-sign with a throwaway key.
+          python3 - <<'PY'
+          import glob
+          for path in glob.glob('build-system/fake-codesigning/profiles/*.mobileprovision'):
+              data = open(path, 'rb').read().replace(b'2026-10-30T17:06:30Z', b'2030-10-30T17:06:30Z')
+              start = data.find(b'<?xml')
+              end = data.find(b'</plist>')
+              if start < 0 or end < 0:
+                  raise SystemExit('no plist payload in ' + path)
+              open(path + '.payload', 'wb').write(data[start:end + len(b'</plist>')])
+          PY
+          openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+            -keyout /tmp/fake-codesigning.key -out /tmp/fake-codesigning.crt \
+            -subj "/CN=Fake Codesigning" 2>/dev/null
+          for p in build-system/fake-codesigning/profiles/*.mobileprovision; do
+            openssl smime -sign -in "$p.payload" -outform der -nodetach \
+              -signer /tmp/fake-codesigning.crt -inkey /tmp/fake-codesigning.key -out "$p"
+            rm -f "$p.payload"
+            openssl smime -verify -noverify -inform der -in "$p" > /dev/null
+          done
+
           python3 build-system/Make/ImportCertificates.py --path build-system/fake-codesigning/certs
           python3 -u build-system/Make/Make.py \
             --bazelUserRoot="$BAZEL_USER_ROOT" \
