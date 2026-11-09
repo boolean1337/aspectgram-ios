@@ -77,6 +77,8 @@ jobs:
           import glob
           for path in glob.glob('build-system/fake-codesigning/profiles/*.mobileprovision'):
               data = open(path, 'rb').read().replace(b'2026-10-30T17:06:30Z', b'2030-10-30T17:06:30Z')
+              # Match the app's custom bundle id (appstore-configuration.json)
+              data = data.replace(b'ph.telegra.Telegraph', b'com.aspectgram.app')
               start = data.find(b'<?xml')
               end = data.find(b'</plist>')
               if start < 0 or end < 0:
